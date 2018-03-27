@@ -52,6 +52,19 @@ On Windows worker nodes, run the following command to generate a local support d
 ```powershell
 docker container run --name windowssupport -v 'C:\ProgramData\docker\daemoncerts:C:\ProgramData\docker\daemoncerts' -v 'C:\Windows\system32\winevt\logs:C:\eventlogs:ro' {{ page.ucp_org }}/ucp-dsinfo-win:{{ page.ucp_version }}; docker cp windowssupport:'C:\dsinfo' .; docker rm -f windowssupport
 ```
+## From the CLI - Multiple Nodes
 
-This command creates a directory named `dsinfo` in your current directory.
-If you want an archive file, you need to create it from the `dsinfo` directory.
+There are certain instances where generating a support bundle from the UCP UI will not work properly. The previous CLI method generates a support dump for whichever host the command is ran from only. This can be an involved process if a support dump is needed from every node in the cluster. The below process will explain how to generate support details for each host in the cluster from one remote host.
+
+The below variables need to be set initially and folders created. Please also note the below variables should be changed to fit your environment:
+    ```
+    $ SUPPORT_DUMP_DIR=<^>/opt<^^>
+    $ SUPPORT_DUMP_TEMPDIR=${SUPPORT_DUMP_DIR}/support_dump_temp
+    $ DUMP_DATE=$(date +%Y%m%d-%H_%M_%S)
+    $ mkdir ${SUPPORT_DUMP_TEMPDIR}
+    $ UCP_VERSION=$(docker service inspect ucp-agent --format '{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{$varval:= split . "="}}{{if eq "IMAGE_VERSION" (index $varval 0)}}{{index $varval 1}}{{end}}{{end}}')
+    ```
+The below command creates a zip file that contains support details (dsinfo) for each host in your cluster:
+
+    ```
+    $ for node in $(docker node ls --format '{{if eq .Status "Ready"}}{{.Hostname}}{{end}}'); do echo timing support dump on $node; time docker container run --rm -e constraint:node==$node -v /boot:/boot -v /proc/:/host/proc:ro -v /var/run/docker.sock:/var/run/docker.sock -v /var/run/docker.pid:/var/run/docker.pid:ro -v /var/run/docker:/var/run/docker -v /var/lib/docker:/var/lib/docker -v /var/log:/var/log -v /etc:/etc:ro --privileged --pid=host --network=host --log-driver=json-file docker/ucp-dsinfo:${UCP_VERSION} > ${SUPPORT_DUMP_TEMPDIR}/support_dump_${node}.tgz; mkdir ${SUPPORT_DUMP_TEMPDIR}/${node}; tar -xf ${SUPPORT_DUMP_TEMPDIR}/support_dump_${node}.tgz -C ${SUPPORT_DUMP_TEMPDIR}/${node}; rm -f ${SUPPORT_DUMP_TEMPDIR}/support_dump_${node}.tgz; cd ${SUPPORT_DUMP_TEMPDIR} ; zip -q -r ${SUPPORT_DUMP_DIR}/docker-support-${DUMP_DATE}.zip . *; cd ..; done
