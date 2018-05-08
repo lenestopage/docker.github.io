@@ -28,6 +28,16 @@ To confirm how DTR is configured, check the **Settings** page on the web UI.
 
 ![DTR settings](../../images/use-a-web-proxy-1.png){: .with-border}
 
+If your web proxy requires authentication, please see the below format of the value for both the --http-proxy and --https-proxy flags:
+
+```bash
+docker run -it --rm \
+  {{ page.dtr_org }}/{{ page.dtr_repo }}:{{ page.dtr_version }} reconfigure \
+  --http-proxy proxy_username:proxy_password@<domain>:<port> \
+  --https-proxy proxy_username:proxy_password@<domain>:<port> \
+  --ucp-insecure-tls
+```
+
 ## Where to go next
 
 - [Configure garbage collection](garbage-collection.md)
